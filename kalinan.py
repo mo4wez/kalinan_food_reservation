@@ -86,13 +86,22 @@ class Kalinan:
         self.driver.get(url)
         sleep(2)
 
-        # table_locator = (By.ID, 'cphMain_grdReservationLunch')
-        # WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(table_locator))
-        # rows = self.driver.find_elements(By.XPATH, '//tr[@style="background-color:#EAFAEA;"]')
-        # rows = self.driver.find_elements(By.XPATH, '//*[@id="cphMain_grdReservationLunch"]/tbody/tr[2]')
-        
-        # rows = self.driver.find_elements(By.XPATH, '//table[@id="cphMain_grdReservationLunch"]/tbody/tr')
-        table = self.driver.find_element(By.ID, 'cphMain_grdReservationLunch')
+        lunch_table = 'lunch'
+        dinner_table = 'dinner'
+        food_type = input('Enter food type: ')
+
+        if food_type == lunch_table:
+            self._get_food_table(food_table='cphMain_grdReservationLunch')
+        if food_type == 'dinner':
+            dinner_label = self.driver.find_element(By.XPATH, '//*[@id="cphMain_lblDinner"]')
+            sleep(2)
+            dinner_label.click()
+            sleep(2)
+            self._get_food_table(food_table='cphMain_grdReservationDinner')
+
+
+    def _get_food_table(self, food_table):
+        table = self.driver.find_element(By.ID, food_table)
         rows = table.find_elements(By.XPATH, './/tr[position() > 1]')
 
         for row in rows:
