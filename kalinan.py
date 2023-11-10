@@ -4,7 +4,8 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 from kalinan_config import KalinanConfig
 from PIL import Image
 from time import sleep
@@ -25,6 +26,9 @@ class Kalinan:
     def run(self):
         sleep(3)
         self._login_to_kalinan()
+        sleep(2)
+        self._go_to_reservation_page()
+        sleep(10)
 
     def _setup_driver(self):
         logging.info('Setting up driver...')
@@ -52,6 +56,8 @@ class Kalinan:
         password_field.send_keys('971097209')
         captcha_code = self._solve_captcha()
         captcha_field.send_keys(captcha_code)
+        sleep(2)
+        login_button.click()
         sleep(7)
 
     def _download_captcha_image(self):
@@ -74,6 +80,40 @@ class Kalinan:
         number = result[0][1]
         # Print the extracted number
         return str(number)
+
+    def _go_to_reservation_page(self):
+        url = 'https://food1.kermancfu.ir/Reservation/Reservation.aspx'
+        self.driver.get(url)
+        sleep(2)
+
+        # table_locator = (By.ID, 'cphMain_grdReservationLunch')
+        # WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(table_locator))
+        # rows = self.driver.find_elements(By.XPATH, '//tr[@style="background-color:#EAFAEA;"]')
+        # rows = self.driver.find_elements(By.XPATH, '//*[@id="cphMain_grdReservationLunch"]/tbody/tr[2]')
+        
+        # rows = self.driver.find_elements(By.XPATH, '//table[@id="cphMain_grdReservationLunch"]/tbody/tr')
+        table = self.driver.find_element(By.ID, 'cphMain_grdReservationLunch')
+        rows = table.find_elements(By.XPATH, './/tr[position() > 1]')
+
+        for row in rows:
+            checkbox = row.find_element(By.XPATH, './/input[@type="checkbox"]')
+            day = row.find_element(By.XPATH, './/td[2]').text
+            food_select = row.find_element(By.XPATH, './/td[4]/select')
+            food_options = food_select.find_elements(By.XPATH, 'option')
+            foods = [option.text for option in food_options]
+            try:
+                status_img = row.find_element(By.XPATH, './/td[8]/img')
+                status = status_img.get_attribute('title')
+            except NoSuchElementException:
+                status = 'رزرو نشده'
+
+            print("Checkbox:", checkbox.is_selected())
+            print("Day:", day)
+            print("Food:", foods)  # This will print a list of all options
+            print("Status:", status)
+            print("------------------------------")
+
+
 
 
 
