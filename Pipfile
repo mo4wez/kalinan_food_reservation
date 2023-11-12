@@ -13,6 +13,7 @@ python-dotenv = "*"
 tgcrypto = "*"
 opencv-python = "*"
 easyocr = "*"
+python-telegram-bot = "*"
 
 [dev-packages]
 

@@ -24,6 +24,11 @@ class Kalinan:
         self.student_name = None
 
     def run(self):
+        # Configure logging
+        logging.basicConfig(
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            level=logging.INFO
+        )
         sleep(3)
         self._login_to_kalinan()
         sleep(2)
@@ -92,7 +97,7 @@ class Kalinan:
 
         if food_type == lunch_table:
             self._get_food_table(food_table='cphMain_grdReservationLunch')
-        if food_type == 'dinner':
+        if food_type == dinner_table:
             dinner_label = self.driver.find_element(By.XPATH, '//*[@id="cphMain_lblDinner"]')
             sleep(2)
             dinner_label.click()
@@ -121,11 +126,3 @@ class Kalinan:
             print("Food:", foods)  # This will print a list of all options
             print("Status:", status)
             print("------------------------------")
-
-
-
-
-
-
-
-
