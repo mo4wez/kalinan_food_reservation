@@ -6,19 +6,16 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
-from kalinan_config import KalinanConfig
-from PIL import Image
+from config.kalinan_config import KalinanConfig
+from captcha_solver.cap_solver import solve_captcha
 from time import sleep
 import logging
-import re
-import easyocr
-import numpy as np
 
 
 class Kalinan:
     def __init__(self):
         self.config = KalinanConfig()
-        self.driver = self.setup_driver()
+        self.driver = self._setup_driver()
         self.term_no = None
         self.captcha_code = None
         self.student_name = None
@@ -35,7 +32,7 @@ class Kalinan:
         self.go_to_reservation_page()
         sleep(10)
 
-    def setup_driver(self):
+    def _setup_driver(self):
         logging.info('Setting up driver...')
         # options = Options()
         # excluded_url = 'https://education.cfu.ac.ir/forms/authenticateuser/main.htm'
@@ -59,7 +56,7 @@ class Kalinan:
 
         username_field.send_keys('40111913299')
         password_field.send_keys('971097209')
-        captcha_code = self.solve_captcha()
+        captcha_code = solve_captcha()
         captcha_field.send_keys(captcha_code)
         sleep(2)
         login_button.click()
@@ -69,22 +66,6 @@ class Kalinan:
         captcha_image = self.driver.find_element(By.XPATH, '//*[@id="Img1"]')
         captcha_image.screenshot(r'C:\Users\moawezz\Desktop\Kalinan\Captchas\cap.png')
         logging.info('captcha image saved.')
-
-    def solve_captcha(self):
-        # Load the image using PIL
-        try:
-            image = Image.open(r'C:\Users\moawezz\Desktop\Kalinan\Captchas\cap.png')
-            image = np.array(image)
-        except IOError as e:
-            print("An error occurred while trying to load the image: ", str(e))
-
-        # Recognize the text using easyocr
-        reader = easyocr.Reader(['en'])
-        result = reader.readtext(image)
-        # Extract the number from the recognized text
-        number = result[0][1]
-        # Print the extracted number
-        return str(number)
 
     def go_to_reservation_page(self):
         url = 'https://food1.kermancfu.ir/Reservation/Reservation.aspx'
