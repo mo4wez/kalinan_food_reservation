@@ -18,7 +18,7 @@ import numpy as np
 class Kalinan:
     def __init__(self):
         self.config = KalinanConfig()
-        self.driver = self._setup_driver()
+        self.driver = self.setup_driver()
         self.term_no = None
         self.captcha_code = None
         self.student_name = None
@@ -30,12 +30,12 @@ class Kalinan:
             level=logging.INFO
         )
         sleep(3)
-        self._login_to_kalinan()
+        self.login_to_kalinan()
         sleep(2)
-        self._go_to_reservation_page()
+        self.go_to_reservation_page()
         sleep(10)
 
-    def _setup_driver(self):
+    def setup_driver(self):
         logging.info('Setting up driver...')
         # options = Options()
         # excluded_url = 'https://education.cfu.ac.ir/forms/authenticateuser/main.htm'
@@ -45,7 +45,7 @@ class Kalinan:
 
         return driver
     
-    def _login_to_kalinan(self):
+    def login_to_kalinan(self):
         self.driver.get(self.config.login_url)
 
         username_field = self.driver.find_element(By.XPATH, '//*[@id="txtUsernamePlain"]')
@@ -54,23 +54,23 @@ class Kalinan:
         login_button = self.driver.find_element(By.XPATH, '//*[@id="btnEncript"]')
         sleep(3)
 
-        self._download_captcha_image()
+        self.download_captcha_image()
         sleep(2)
 
         username_field.send_keys('40111913299')
         password_field.send_keys('971097209')
-        captcha_code = self._solve_captcha()
+        captcha_code = self.solve_captcha()
         captcha_field.send_keys(captcha_code)
         sleep(2)
         login_button.click()
         sleep(7)
 
-    def _download_captcha_image(self):
+    def download_captcha_image(self):
         captcha_image = self.driver.find_element(By.XPATH, '//*[@id="Img1"]')
         captcha_image.screenshot(r'C:\Users\moawezz\Desktop\Kalinan\Captchas\cap.png')
         logging.info('captcha image saved.')
 
-    def _solve_captcha(self):
+    def solve_captcha(self):
         # Load the image using PIL
         try:
             image = Image.open(r'C:\Users\moawezz\Desktop\Kalinan\Captchas\cap.png')
@@ -86,28 +86,30 @@ class Kalinan:
         # Print the extracted number
         return str(number)
 
-    def _go_to_reservation_page(self):
+    def go_to_reservation_page(self):
         url = 'https://food1.kermancfu.ir/Reservation/Reservation.aspx'
         self.driver.get(url)
         sleep(2)
 
-        lunch_table = 'lunch'
-        dinner_table = 'dinner'
+        lunch = 'ناهار'
+        dinner = 'شام'
         food_type = input('Enter food type: ')
 
-        if food_type == lunch_table:
-            self._get_food_table(food_table='cphMain_grdReservationLunch')
-        if food_type == dinner_table:
+        if food_type == lunch:
+            self.get_meal_table_data(meal_table='cphMain_grdReservationLunch', meal=lunch)
+        if food_type == dinner:
             dinner_label = self.driver.find_element(By.XPATH, '//*[@id="cphMain_lblDinner"]')
             sleep(2)
             dinner_label.click()
             sleep(2)
-            self._get_food_table(food_table='cphMain_grdReservationDinner')
+            self.get_meal_table_data(meal_table='cphMain_grdReservationDinner', meal=dinner)
 
 
-    def _get_food_table(self, food_table):
-        table = self.driver.find_element(By.ID, food_table)
+    def get_meal_table_data(self, meal_table, meal):
+        food_data = {}
+        table = self.driver.find_element(By.ID, meal_table)
         rows = table.find_elements(By.XPATH, './/tr[position() > 1]')
+        meal = self.driver.find_element(By.XPATH, f'//div[contains(text(), "{meal}")]').text
 
         for row in rows:
             checkbox = row.find_element(By.XPATH, './/input[@type="checkbox"]')
@@ -121,8 +123,16 @@ class Kalinan:
             except NoSuchElementException:
                 status = 'رزرو نشده'
 
+            print('Meal:', meal)
             print("Checkbox:", checkbox.is_selected())
             print("Day:", day)
             print("Food:", foods)  # This will print a list of all options
             print("Status:", status)
             print("------------------------------")
+
+            food_data['meal'] = meal
+            food_data['checkbox'] = checkbox.is_selected()
+            food_data['day'] = day
+            food_data['foods'] = foods
+            food_data['status'] = status
+
