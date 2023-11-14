@@ -54,11 +54,12 @@ class Kalinan:
         self.download_captcha_image()
         sleep(2)
 
-        username_field.send_keys('40111913299')
-        password_field.send_keys('971097209')
         captcha_code = solve_captcha()
+        username_field.send_keys('40111913299')
+        password_field.send_keys('971097209')         
         captcha_field.send_keys(captcha_code)
         sleep(2)
+
         login_button.click()
         sleep(7)
 
@@ -68,8 +69,7 @@ class Kalinan:
         logging.info('captcha image saved.')
 
     def go_to_reservation_page(self):
-        url = 'https://food1.kermancfu.ir/Reservation/Reservation.aspx'
-        self.driver.get(url)
+        self.driver.get(self.config.reserve_url)
         sleep(2)
 
         lunch = 'ناهار'
@@ -116,4 +116,6 @@ class Kalinan:
             food_data['day'] = day
             food_data['foods'] = foods
             food_data['status'] = status
+
+        return food_data
 
