@@ -1,5 +1,6 @@
+import os
 import logging
-import re
+from kalinan import Kalinan
 from config.kalinan_config import KalinanConfig
 from peewee import DoesNotExist
 from models.user_model import User
@@ -24,11 +25,13 @@ from telegram.ext import (
 
 
 class KalinanBot:
-    def __init__(self):
+    def __init__(self, kalinan_instanse: Kalinan):
+        self.kalinan = kalinan_instanse
+        # self.kalinan.load_cookies('cookies.pkl')
         self.config = KalinanConfig()
         self.bot = Application.builder().token(self.config.token).build()
         self.USERNAME, self.PASSWORD, self.REGISTER = range(3)
-        self.MEAL, self.DAYS, self.FOODS = range(3)
+
 
     def run(self):
         # Configure logging
@@ -46,21 +49,13 @@ class KalinanBot:
             },
             fallbacks=[]
         )
-
         self.bot.add_handler(registeration_handler)
 
-        reservation_handler = ConversationHandler(
-            entry_points=[CallbackQueryHandler(self.button_callback)],
-            states={
-                self.MEAL: [CallbackQueryHandler(self.button_callback)],
-                self.DAYS: [CallbackQueryHandler(self.button_callback)],
-                self.FOODS: [CallbackQueryHandler(self.button_callback)],
-            },
-            fallbacks=[]
-        )
+        reservation_handler = CallbackQueryHandler(self.button_callback)
+        self.bot.add_handler(reservation_handler, group=1)
 
-        self.bot.add_handler(reservation_handler)
-
+        day_data_handler = CallbackQueryHandler(self.show_day_data)
+        self.bot.add_handler(day_data_handler, group=2)
 
         self.bot.run_polling()
 
@@ -70,12 +65,22 @@ class KalinanBot:
         chat_id = str(user.id)
 
         try:
-            existing_user = User.get(User.chat_id == chat_id)
-            await context.bot.send_message(
+            # if self.kalinan.is_logged_in():
+            user: User = User.get(chat_id=chat_id)
+            sent_message = await context.bot.send_message(
                 chat_id=chat_id,
-                text='You already registered.'
+                text='Logging in to Kalinan...'
             )
-            await self.choose_meal_menu(update, context)
+            self.kalinan.login_to_kalinan(
+                kalinan_username=user.kalinan_username,
+                kalinan_password=user.kalinan_password,
+            )
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=sent_message.message_id,
+                text='Login successful.'
+                )
+            await self.show_meal_menu(update, context, chat_id)
 
         except DoesNotExist:
             await update.message.reply_text("You are not registered. Let's start the registration process.")
@@ -86,7 +91,7 @@ class KalinanBot:
                 chat_id=chat_id,
                 text='Click the button below to start the registration process:',
                 reply_markup = reply_markup,
-            )
+                )
 
         return self.USERNAME
 
@@ -102,19 +107,39 @@ class KalinanBot:
             )
             return self.PASSWORD
         
-        if query.data == 'lunch':
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text='lucnh selected',
-                )
-            return self.MEAL
-            
-        if query.data == 'dinner':
-            await context.bot.send_message(
-            chat_id=chat_id,
-            text='dinner selected',
+        if query.data == 'ناهار':
+            self.kalinan.go_to_reservation_page(meal=query.data)
+            self.lunch_data = self.kalinan.get_meal_table_data(
+                meal_table='cphMain_grdReservationLunch',
+                meal=query.data
             )
-            return self.MEAL
+            self.current_meal_data = self.lunch_data
+
+            await self.show_days_list(update, context, chat_id, meal_data=self.lunch_data)
+
+        elif query.data == 'شام':
+            self.kalinan.go_to_reservation_page(meal=query.data)
+            self.dinner_data = self.kalinan.get_meal_table_data(
+                meal_table='cphMain_grdReservationDinner',
+                meal=query.data
+            )
+            self.current_meal_data = self.dinner_data
+
+            await self.show_days_list(update, context, chat_id, meal_data=self.dinner_data)
+        
+        elif query.data == 'days_menu':
+            await self.show_days_list(update, context, chat_id, meal_data=self.current_meal_data)
+
+        elif query.data == 'next_day' or query.data == 'prev_day':
+            # Pass the 'prev_day' or 'next_day' action to show_day_data
+            await self.show_day_data(update, context, meal_data=self.current_meal_data)
+
+        elif query.data == 'meals_menu':
+            await self.show_meal_menu(update, context, chat_id)
+        
+        else:
+            if query.data.isdigit():
+                await self.show_day_data(update, context, meal_data=self.current_meal_data)
 
  
     async def get_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -136,18 +161,22 @@ class KalinanBot:
         message_id = update.message.id
 
         kalinan_username = context.user_data.get('kalinan_username')
-        kalinan_password = update.message.text
+        context.user_data['kalinan_password'] = update.message.text
+        kalinan_password = context.user_data['kalinan_password']
 
-        new_user = User.create_user(chat_id, user.first_name, user.username, kalinan_username, kalinan_password)
+        new_user: User = User.create_user(chat_id, user.first_name, user.username, kalinan_username, kalinan_password)
+        self.kalinan.login_to_kalinan(
+            kalinan_username=new_user.kalinan_username,
+            kalinan_password=new_user.kalinan_password,
+        )
         await update.message.reply_text('You have been successfully registered.')
-        await self.choose_meal_menu(update, context)
-
+        await self.show_meal_menu(update, context)
 
         return ConversationHandler.END
 
-    async def choose_meal_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        chat_id = update.message.from_user.id
-        keyboard = [[InlineKeyboardButton("Lunch", callback_data='lunch')], [InlineKeyboardButton("Dinner", callback_data='dinner')]]
+    async def show_meal_menu(self, update: Update, context: CallbackContext, chat_id):
+        query = update.callback_query
+        keyboard = [[InlineKeyboardButton("Lunch", callback_data='ناهار')], [InlineKeyboardButton("Dinner", callback_data='شام')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.send_message(
@@ -156,19 +185,63 @@ class KalinanBot:
             reply_markup=reply_markup
         )
 
-    async def show_days_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        chat_id = update.message.from_user.id
-        keyboard = [[InlineKeyboardButton('saturday', callback_data='sat')], [InlineKeyboardButton('sunday', callback_data='sun')]]
+    async def show_days_list(self, update: Update, context: CallbackContext, chat_id, meal_data):
+        query = update.callback_query
+        keyboard = [
+            [InlineKeyboardButton(day, callback_data=str(index))] 
+            for index, (day, data_list) in enumerate(meal_data.items())
+            ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text='choose a day',
-            reply_markup=keyboard
+        await query.message.edit_text(
+            text='Days:',
+            reply_markup=reply_markup
         )
 
+    async def show_day_data(self, update: Update, context: CallbackContext, meal_data):
+        all_buttons = []
+        query = update.callback_query
 
+        day_index = context.user_data.get('current_day_index', 0)
+        meal_data = context.user_data.get('meal_data')
+        current_day_index = context.user_data.get('current_day_index', 0)
 
+        if day_index.isdigit():
+            current_day_index = int(day_index)
+        elif day_index == 'next_day':
+            current_day_index += 1
+        elif day_index == 'prev_day':
+            current_day_index -= 1
 
-if __name__ == '__main__':
-    bot = KalinanBot()
-    bot.run()
+        current_day_index = max(0, min(current_day_index, len(meal_data) - 1))
+        context.user_data['current_day_index'] = current_day_index
+
+        day, data_list = list(meal_data.items())[current_day_index]
+        foods = data_list[0]['foods']
+        status = data_list[0]['status']
+
+        foods_buttons = [
+            [InlineKeyboardButton(food, callback_data=f'food_{index}')] 
+            for index, food in enumerate(foods)
+        ]
+
+        status_button = [InlineKeyboardButton(status, callback_data='status')]
+
+        day_buttons = [
+            [InlineKeyboardButton("Days", callback_data='days_menu')],
+            [InlineKeyboardButton("Meals", callback_data='meals_menu')],
+            [
+                InlineKeyboardButton("Previous Day", callback_data='prev_day'),
+                InlineKeyboardButton("Next Day", callback_data='next_day')
+            ]
+        ]
+
+        all_buttons = foods_buttons + [status_button] + day_buttons
+        reply_markup = InlineKeyboardMarkup(all_buttons)
+
+        await query.message.edit_text(
+            text=day,
+            reply_markup=reply_markup
+        )
+                

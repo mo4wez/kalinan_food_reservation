@@ -10,89 +10,103 @@ from config.kalinan_config import KalinanConfig
 from captcha_solver.cap_solver import solve_captcha
 from time import sleep
 import logging
+import os
+import pickle
 
 
 class Kalinan:
     def __init__(self):
-        self.config = KalinanConfig()
         self.driver = self._setup_driver()
+        self.config = KalinanConfig()
         self.term_no = None
         self.captcha_code = None
         self.student_name = None
 
-    def run(self):
-        # Configure logging
-        logging.basicConfig(
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            level=logging.INFO
-        )
-        sleep(3)
-        self.login_to_kalinan()
-        sleep(2)
-        self.go_to_reservation_page()
-        sleep(10)
+    #     if os.path.exists('cookies.pkl'):
+    #         self.load_cookies()
+    #     else:
+    #         self.save_cookies()
+
+    # def save_cookies(self):
+    #     if self.is_logged_in():
+    #         with open('cookies.pkl', 'wb') as filehandler:
+    #             pickle.dump(self.driver.get_cookies(), filehandler)
+
+    # def load_cookies(self):
+    #     expected_domain = self.config.dashboard_url
+    #     if self.driver.current_url == expected_domain:
+    #         with open('cookies.pkl', 'rb') as cookiesfile:
+    #             cookies = pickle.load(cookiesfile)
+    #             for cookie in cookies:
+    #                 self.driver.add_cookie(cookie)
+    #     else:
+    #         print("Domain mismatch! Please log in to the correct domain to load cookies.")
+        # self.driver.get(self.config.reserve_url)
 
     def _setup_driver(self):
         logging.info('Setting up driver...')
-        # options = Options()
-        # excluded_url = 'https://education.cfu.ac.ir/forms/authenticateuser/main.htm'
+        options = Options()
         # options.add_argument(f"--no-proxy-server={excluded_url}")
-        # options.add_argument("--headless=new")  # run in headless mode (without gui)
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),)
+        options.add_argument("--headless=new")  # run in headless mode (without gui)
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
         return driver
+
+    def is_logged_in(self):
+        try:
+            expected_url = self.config.dashboard_url
+            current_url = self.driver.current_url
+            return expected_url in current_url
+        except Exception as e:
+            print('Not loged in: ', e)
+            return False
     
-    def login_to_kalinan(self):
+    def login_to_kalinan(self, kalinan_username: str, kalinan_password: str):
         self.driver.get(self.config.login_url)
 
         username_field = self.driver.find_element(By.XPATH, '//*[@id="txtUsernamePlain"]')
         password_field = self.driver.find_element(By.XPATH, '//*[@id="txtPasswordPlain"]')
         captcha_field = self.driver.find_element(By.XPATH, '//*[@id="txtCaptcha"]')
         login_button = self.driver.find_element(By.XPATH, '//*[@id="btnEncript"]')
-        sleep(3)
+        sleep(1)
 
         self.download_captcha_image()
-        sleep(2)
+        sleep(1)
 
         captcha_code = solve_captcha()
-        username_field.send_keys('40111913299')
-        password_field.send_keys('971097209')         
+        username_field.send_keys(str(kalinan_username))
+        password_field.send_keys(str(kalinan_password))         
         captcha_field.send_keys(captcha_code)
-        sleep(2)
+        sleep(1)
 
         login_button.click()
-        sleep(7)
+        sleep(3)
+        # self.save_cookies()
 
     def download_captcha_image(self):
         captcha_image = self.driver.find_element(By.XPATH, '//*[@id="Img1"]')
         captcha_image.screenshot(r'C:\Users\moawezz\Desktop\Kalinan\Captchas\cap.png')
         logging.info('captcha image saved.')
 
-    def go_to_reservation_page(self):
+    def go_to_reservation_page(self, meal: str = None):
         self.driver.get(self.config.reserve_url)
-        sleep(2)
+        sleep(1)
 
-        lunch = 'ناهار'
-        dinner = 'شام'
-        food_type = input('Enter food type: ')
-
-        if food_type == lunch:
-            self.get_meal_table_data(meal_table='cphMain_grdReservationLunch', meal=lunch)
-        if food_type == dinner:
+        if meal == 'ناهار':
+            lunch_lable = self.driver.find_element(By.XPATH, '//*[@id="UpdatePanel1"]/div[4]/ul/li[2]/label')
+            lunch_lable.click()
+        if meal == 'شام':
             dinner_label = self.driver.find_element(By.XPATH, '//*[@id="cphMain_lblDinner"]')
-            sleep(2)
             dinner_label.click()
-            sleep(2)
-            self.get_meal_table_data(meal_table='cphMain_grdReservationDinner', meal=dinner)
-
 
     def get_meal_table_data(self, meal_table, meal):
-        food_data = {}
+        food_data_collection = {}
         table = self.driver.find_element(By.ID, meal_table)
         rows = table.find_elements(By.XPATH, './/tr[position() > 1]')
         meal = self.driver.find_element(By.XPATH, f'//div[contains(text(), "{meal}")]').text
 
         for row in rows:
+            food_data = {}
             checkbox = row.find_element(By.XPATH, './/input[@type="checkbox"]')
             day = row.find_element(By.XPATH, './/td[2]').text
             food_select = row.find_element(By.XPATH, './/td[4]/select')
@@ -104,18 +118,18 @@ class Kalinan:
             except NoSuchElementException:
                 status = 'رزرو نشده'
 
-            print('Meal:', meal)
-            print("Checkbox:", checkbox.is_selected())
-            print("Day:", day)
-            print("Food:", foods)  # This will print a list of all options
-            print("Status:", status)
-            print("------------------------------")
-
             food_data['meal'] = meal
             food_data['checkbox'] = checkbox.is_selected()
-            food_data['day'] = day
             food_data['foods'] = foods
             food_data['status'] = status
 
-        return food_data
+            day_key = day
+            if day_key not in food_data_collection:
+                food_data_collection[day_key] = []
+
+            food_data_collection[day_key].append(food_data)
+
+        print(food_data_collection)
+
+        return food_data_collection
 

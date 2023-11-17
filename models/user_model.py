@@ -14,17 +14,14 @@ class User(Model):
         database = db
 
     @classmethod
-    def create_user(cls, chat_id, first_name, username, kalinan_username, raw_password):
-        # Hash the password before storing it
-        hashed_password = bcrypt.hashpw(raw_password.encode('utf-8'), bcrypt.gensalt())
-
-        # Create a new user with the hashed password
+    def create_user(cls, chat_id, first_name, username, kalinan_username, kalinan_password):
+        # Create a new user
         return cls.create(
             chat_id=chat_id,
             first_name=first_name,
             username=username,
             kalinan_username=kalinan_username,
-            kalinan_password=hashed_password.decode('utf-8')  # Convert bytes to string for storage
+            kalinan_password=kalinan_password  # Convert bytes to string for storage
         )
 
 db.connect()

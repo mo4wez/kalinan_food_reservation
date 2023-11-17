@@ -1,7 +1,8 @@
 {
     "tele_notif": false,
     "kalinan_login_url": "https://food1.kermancfu.ir/Login.aspx",
-    "reservation_url": "https://food1.kermancfu.ir/Reservation/Reservation.aspx",
+    "kalinan_dashboard_url": "https://food1.kermancfu.ir/Master/Default.aspx",
+    "kalinan_reservation_url": "https://food1.kermancfu.ir/Reservation/Reservation.aspx",
     "sms_notif": false,
     "refresh_rate": 3
 }

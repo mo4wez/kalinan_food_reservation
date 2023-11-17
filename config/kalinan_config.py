@@ -8,7 +8,7 @@ from exceptions.exceptions import InvalidJsonConfigFileException
 class KalinanConfig:
     def __init__(self):
         try:
-            self.login_url, self.reserve_url, self.sms_notif, self.tele_notif = self._read_config()
+            self.login_url, self.reserve_url, self.dashboard_url, self.sms_notif, self.tele_notif = self._read_config()
             self.api_id, self.api_hash, self.token = self._read_env_config()
         except InvalidJsonConfigFileException:
             exit(2)
@@ -30,12 +30,13 @@ class KalinanConfig:
 
         if 'kalinan_login_url' not in data:
             raise InvalidJsonConfigFileException('kalinan_login_url')
-        if 'reservation_url' not in data:
-            raise InvalidJsonConfigFileException('reservation_url')
+        if 'kalinan_reservation_url' not in data:
+            raise InvalidJsonConfigFileException('kalinan_reservation_url')
+        if 'kalinan_dashboard_url' not in data:
+            raise InvalidJsonConfigFileException('kalinan_dashboard_url')
         if 'tele_notif' not in data:
             raise InvalidJsonConfigFileException('tele_notif')
         if 'sms_notif' not in data:
             raise InvalidJsonConfigFileException('sms_notif')
-
-
-        return data['kalinan_login_url'], data['reservation_url'], data['sms_notif'], data['tele_notif']
+        
+        return data['kalinan_login_url'], data['kalinan_reservation_url'], data['kalinan_dashboard_url'] ,data['sms_notif'], data['tele_notif']
